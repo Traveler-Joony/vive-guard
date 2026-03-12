@@ -8,7 +8,7 @@
     "vscode": "^1.85.0"
   },
   "activationEvents": [
-    "onView:vibeGuard.dashboard"
+    "onStartupFinished"
   ],
   "categories": [
     "Other"
