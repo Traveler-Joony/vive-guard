@@ -243,3 +243,15 @@ body {
 .grade-c { color: #ffc107; }
 .grade-d { color: #ff9800; }
 .grade-f { color: #f44336; }
+
+/* Trend indicators */
+.metric-trend,
+.score-trend {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.trend-up { color: #f44336; }
+.trend-down { color: #4caf50; }
+.trend-stable { color: var(--vscode-descriptionForeground); }

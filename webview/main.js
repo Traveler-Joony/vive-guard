@@ -92,8 +92,47 @@
     dependenciesValue.textContent = health.dependencies.couplingIndex.toFixed(2);
     dependenciesDetail.textContent = health.dependencies.cycles.length + ' cycles';
 
+    // Trends
+    if (health.trends) {
+      setScoreTrend(health.trends.score);
+      setTrend('metric-complexity', health.trends.complexity);
+      setTrend('metric-duplication', health.trends.duplication);
+      setTrend('metric-patterns', health.trends.patterns);
+      setTrend('metric-dependencies', health.trends.dependencies);
+    }
+
     // Warnings
     renderWarnings(health.warnings, health);
+  }
+
+  function getTrendArrow(trend) {
+    if (trend.direction === 'up') return '\u2191';
+    if (trend.direction === 'down') return '\u2193';
+    return '\u2192';
+  }
+
+  function setScoreTrend(trend) {
+    var el = document.querySelector('.score-trend');
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'score-trend';
+      scoreEl.parentNode.appendChild(el);
+    }
+    el.textContent = getTrendArrow(trend);
+    el.className = 'score-trend trend-' + trend.direction;
+  }
+
+  function setTrend(cardId, trend) {
+    var card = document.getElementById(cardId);
+    if (!card) return;
+    var el = card.querySelector('.metric-trend');
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'metric-trend';
+      card.querySelector('.metric-info').appendChild(el);
+    }
+    el.textContent = getTrendArrow(trend);
+    el.className = 'metric-trend trend-' + trend.direction;
   }
 
   function getPromptForWarning(warning, health) {

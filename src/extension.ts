@@ -10,7 +10,7 @@ let fileWatcher: FileWatcher | undefined;
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel('VibeGuard');
 
-  const sidebarProvider = new SidebarProvider(context.extensionUri);
+  const sidebarProvider = new SidebarProvider(context.extensionUri, context.workspaceState);
 
   const sidebarRegistration = vscode.window.registerWebviewViewProvider(
     SidebarProvider.viewType,
@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   const diagnosticsProvider = new DiagnosticsProvider();
-  const notificationManager = new NotificationManager();
+  const notificationManager = new NotificationManager(context.workspaceState);
 
   fileWatcher = new FileWatcher();
 
@@ -51,6 +51,8 @@ export function activate(context: vscode.ExtensionContext) {
     codeLensProvider.refresh(result);
     diagnosticsProvider.refresh(result);
     notificationManager.refresh(result);
+
+    context.workspaceState.update('vibeGuard.lastHealthScore', result.health);
   });
 
   const refreshCmd = vscode.commands.registerCommand('vibeGuard.refresh', () => {

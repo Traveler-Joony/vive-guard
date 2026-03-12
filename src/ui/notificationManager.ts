@@ -1,11 +1,29 @@
 import * as vscode from 'vscode';
-import type { AnalysisResult, HealthGrade } from '../shared/types';
+import type { AnalysisResult, HealthGrade, HealthScore } from '../shared/types';
 
 export class NotificationManager implements vscode.Disposable {
   private _lastGrade: HealthGrade | undefined;
+  private _lastScore: number | undefined;
+
+  constructor(private readonly _workspaceState: vscode.Memento) {
+    const persisted = _workspaceState.get<HealthScore>('vibeGuard.lastHealthScore');
+    this._lastScore = persisted?.score;
+  }
 
   public refresh(result: AnalysisResult): void {
     const { grade, score } = result.health;
+
+    // Save point recommendation: score worsened by 10+
+    if (this._lastScore !== undefined) {
+      const delta = score - this._lastScore;
+      if (delta >= 10) {
+        vscode.window.showWarningMessage(
+          'VibeGuard: Your project complexity increased significantly. Consider committing your current working state before making more changes.',
+          'Got it',
+        );
+      }
+    }
+    this._lastScore = score;
 
     // Suppress duplicate notifications for the same grade
     if (grade === this._lastGrade) {

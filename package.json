@@ -60,6 +60,37 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "VibeGuard",
+      "properties": {
+        "vibeGuard.maxComplexity": {
+          "type": "number",
+          "default": 15,
+          "description": "Maximum cyclomatic complexity allowed per function before triggering a warning."
+        },
+        "vibeGuard.maxDuplicationRate": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Maximum code duplication rate (0.0–1.0) before triggering a warning."
+        },
+        "vibeGuard.minPatternConsistency": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum pattern consistency score (0.0–1.0) expected across the codebase."
+        },
+        "vibeGuard.maxCouplingIndex": {
+          "type": "number",
+          "default": 0.3,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Maximum coupling index (0.0–1.0) allowed for file dependencies."
+        }
+      }
     }
   },
   "scripts": {

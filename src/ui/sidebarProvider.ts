@@ -1,14 +1,34 @@
 import * as vscode from 'vscode';
-import type { AnalysisResult } from '../shared/types';
+import type { AnalysisResult, HealthScore } from '../shared/types';
 import type { Message } from '../shared/messages';
+
+interface MetricTrend {
+  direction: 'up' | 'down' | 'stable';
+  delta: number;
+}
+
+interface TrendsData {
+  score: MetricTrend;
+  complexity: MetricTrend;
+  duplication: MetricTrend;
+  patterns: MetricTrend;
+  dependencies: MetricTrend;
+}
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'vibeGuard.dashboard';
 
   private _view?: vscode.WebviewView;
   private _pendingResult?: AnalysisResult;
+  private _pendingTrends?: TrendsData;
+  private _previousHealth: HealthScore | undefined;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _workspaceState: vscode.Memento,
+  ) {
+    this._previousHealth = _workspaceState.get<HealthScore>('vibeGuard.lastHealthScore');
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -44,26 +64,74 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     // If analysis completed before the webview was ready, send it now
     if (this._pendingResult) {
-      this.update(this._pendingResult);
+      this._postHealth(this._pendingResult, this._pendingTrends);
+      this._postFiles(this._pendingResult);
       this._pendingResult = undefined;
+      this._pendingTrends = undefined;
     }
   }
 
   public update(result: AnalysisResult): void {
+    const trends = this._computeTrends(result.health);
+
     if (!this._view) {
       this._pendingResult = result;
+      this._pendingTrends = trends;
       return;
     }
 
-    this._view.webview.postMessage({
-      type: 'UPDATE_HEALTH',
-      payload: result.health,
-    });
+    this._postHealth(result, trends);
+    this._postFiles(result);
 
-    this._view.webview.postMessage({
+    this._previousHealth = result.health;
+  }
+
+  private _postHealth(result: AnalysisResult, trends?: TrendsData): void {
+    this._view!.webview.postMessage({
+      type: 'UPDATE_HEALTH',
+      payload: { ...result.health, trends },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+  }
+
+  private _postFiles(result: AnalysisResult): void {
+    this._view!.webview.postMessage({
       type: 'UPDATE_FILES',
       payload: result.files,
     });
+  }
+
+  private _computeTrends(current: HealthScore): TrendsData | undefined {
+    if (!this._previousHealth) {
+      return undefined;
+    }
+    const prev = this._previousHealth;
+
+    const avgComplexity = (files: { average: number }[]) =>
+      files.length > 0
+        ? files.reduce((s, f) => s + f.average, 0) / files.length
+        : 0;
+
+    const complexityDelta =
+      (avgComplexity(current.complexity) - avgComplexity(prev.complexity)) * 5;
+    const duplicationDelta =
+      (current.duplication.duplicationRate - prev.duplication.duplicationRate) * 100;
+    const patternsDelta =
+      (prev.patterns.overallConsistency - current.patterns.overallConsistency) * 100;
+    const depsDelta =
+      (current.dependencies.couplingIndex - prev.dependencies.couplingIndex) * 100;
+
+    return {
+      score: this._toTrend(current.score - prev.score),
+      complexity: this._toTrend(complexityDelta),
+      duplication: this._toTrend(duplicationDelta),
+      patterns: this._toTrend(patternsDelta),
+      dependencies: this._toTrend(depsDelta),
+    };
+  }
+
+  private _toTrend(delta: number): MetricTrend {
+    const direction = delta >= 5 ? 'up' : delta <= -5 ? 'down' : 'stable';
+    return { direction, delta };
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
