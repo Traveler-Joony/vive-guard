@@ -1,0 +1,87 @@
+{
+  "name": "viveguard",
+  "displayName": "VibeGuard",
+  "version": "0.1.0",
+  "description": "Monitor code complexity in real-time for vibe coding projects",
+  "main": "./dist/extension.js",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [
+    "onView:vibeGuard.dashboard"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Traveler-Joony/vive-guard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Traveler-Joony/vive-guard/issues"
+  },
+  "homepage": "https://github.com/Traveler-Joony/vive-guard#readme",
+  "license": "ISC",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vibeGuard",
+          "title": "VibeGuard",
+          "icon": "$(pulse)"
+        }
+      ]
+    },
+    "views": {
+      "vibeGuard": [
+        {
+          "type": "webview",
+          "id": "vibeGuard.dashboard",
+          "name": "Dashboard"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "vibeGuard.refresh",
+        "title": "VibeGuard: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vibeGuard.analyze",
+        "title": "VibeGuard: Analyze Project"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "vibeGuard.refresh",
+          "when": "view == vibeGuard.dashboard",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test": "mocha",
+    "test:unit": "mocha 'test/analyzer/**/*.test.ts'",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package",
+    "pretest": "npm run build"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-electron": "^2.3.8",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.3.0",
+    "typescript": "^5.3.3"
+  }
+}
