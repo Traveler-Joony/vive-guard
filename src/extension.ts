@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { FileWatcher } from './watcher/fileWatcher';
 import { SidebarProvider } from './ui/sidebarProvider';
+import { VibeGuardCodeLensProvider } from './ui/codeLensProvider';
+import { DiagnosticsProvider } from './ui/diagnosticsProvider';
 
 let fileWatcher: FileWatcher | undefined;
 
@@ -13,6 +15,20 @@ export function activate(context: vscode.ExtensionContext) {
     SidebarProvider.viewType,
     sidebarProvider,
   );
+
+  const codeLensProvider = new VibeGuardCodeLensProvider();
+  const codeLensSelector = [
+    { language: 'typescript' },
+    { language: 'javascript' },
+    { language: 'typescriptreact' },
+    { language: 'javascriptreact' },
+  ];
+  const codeLensRegistration = vscode.languages.registerCodeLensProvider(
+    codeLensSelector,
+    codeLensProvider,
+  );
+
+  const diagnosticsProvider = new DiagnosticsProvider();
 
   fileWatcher = new FileWatcher();
 
@@ -30,6 +46,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     sidebarProvider.update(result);
+    codeLensProvider.refresh(result);
+    diagnosticsProvider.refresh(result);
   });
 
   const refreshCmd = vscode.commands.registerCommand('vibeGuard.refresh', () => {
@@ -43,6 +61,9 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     outputChannel,
     sidebarRegistration,
+    codeLensRegistration,
+    codeLensProvider,
+    diagnosticsProvider,
     fileWatcher,
     refreshCmd,
     analyzeCmd,
