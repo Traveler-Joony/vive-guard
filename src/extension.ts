@@ -3,6 +3,7 @@ import { FileWatcher } from './watcher/fileWatcher';
 import { SidebarProvider } from './ui/sidebarProvider';
 import { VibeGuardCodeLensProvider } from './ui/codeLensProvider';
 import { DiagnosticsProvider } from './ui/diagnosticsProvider';
+import { NotificationManager } from './ui/notificationManager';
 
 let fileWatcher: FileWatcher | undefined;
 
@@ -29,6 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   const diagnosticsProvider = new DiagnosticsProvider();
+  const notificationManager = new NotificationManager();
 
   fileWatcher = new FileWatcher();
 
@@ -48,6 +50,7 @@ export function activate(context: vscode.ExtensionContext) {
     sidebarProvider.update(result);
     codeLensProvider.refresh(result);
     diagnosticsProvider.refresh(result);
+    notificationManager.refresh(result);
   });
 
   const refreshCmd = vscode.commands.registerCommand('vibeGuard.refresh', () => {
@@ -64,6 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
     codeLensRegistration,
     codeLensProvider,
     diagnosticsProvider,
+    notificationManager,
     fileWatcher,
     refreshCmd,
     analyzeCmd,

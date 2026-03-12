@@ -149,6 +149,22 @@ body {
   font-style: italic;
 }
 
+.copy-prompt-btn {
+  display: block;
+  margin-top: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  cursor: pointer;
+}
+
+.copy-prompt-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
+}
+
 /* ── Files List ── */
 
 .files-list {

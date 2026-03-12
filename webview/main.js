@@ -93,10 +93,45 @@
     dependenciesDetail.textContent = health.dependencies.cycles.length + ' cycles';
 
     // Warnings
-    renderWarnings(health.warnings);
+    renderWarnings(health.warnings, health);
   }
 
-  function renderWarnings(warnings) {
+  function getPromptForWarning(warning, health) {
+    // High complexity — extract filename from ""{name}" has high complexity..."
+    if (warning.indexOf('high complexity') !== -1) {
+      var match = warning.match(/"([^"]+)"/);
+      var filename = match ? match[1] : 'this file';
+      return 'Split ' + filename + ' into smaller functions. Each function should do one thing.';
+    }
+    // Duplication
+    if (warning.indexOf('duplicated') !== -1) {
+      var blocks = health.duplication.blocks;
+      if (blocks.length > 0) {
+        var src = blocks[0].sourceFile.split('/').pop();
+        var tgt = blocks[0].targetFile.split('/').pop();
+        return 'Extract the duplicated code between ' + src + ' and ' + tgt + ' into a shared utility.';
+      }
+      return 'Extract the duplicated code between files into a shared utility.';
+    }
+    // Pattern inconsistency
+    if (warning.indexOf('inconsistent') !== -1 || warning.indexOf('Inconsistent') !== -1) {
+      var patterns = health.patterns.patterns;
+      var dominant = patterns.length > 0 ? patterns[0].dominant : 'a consistent';
+      return 'Standardize error handling across all files to use ' + dominant + ' pattern.';
+    }
+    // Circular dependencies
+    if (warning.indexOf('circular') !== -1) {
+      var cycles = health.dependencies.cycles;
+      if (cycles.length > 0) {
+        var files = cycles[0].files.map(function (f) { return f.split('/').pop(); }).join(', ');
+        return 'Remove circular dependency between ' + files + '. Extract shared logic into a separate module.';
+      }
+      return 'Remove circular dependency between files. Extract shared logic into a separate module.';
+    }
+    return null;
+  }
+
+  function renderWarnings(warnings, health) {
     warningsList.innerHTML = '';
     if (warnings.length === 0) {
       var li = document.createElement('li');
@@ -108,7 +143,31 @@
     for (var i = 0; i < warnings.length; i++) {
       var li = document.createElement('li');
       li.className = 'warning-item';
-      li.textContent = warnings[i];
+
+      var textSpan = document.createElement('span');
+      textSpan.textContent = warnings[i];
+      li.appendChild(textSpan);
+
+      var prompt = getPromptForWarning(warnings[i], health);
+      if (prompt) {
+        var btn = document.createElement('button');
+        btn.className = 'copy-prompt-btn';
+        btn.textContent = 'Copy AI Prompt';
+        btn.setAttribute('data-prompt', prompt);
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var button = this;
+          var text = button.getAttribute('data-prompt');
+          navigator.clipboard.writeText(text).then(function () {
+            button.textContent = 'Copied!';
+            setTimeout(function () {
+              button.textContent = 'Copy AI Prompt';
+            }, 1500);
+          });
+        });
+        li.appendChild(btn);
+      }
+
       warningsList.appendChild(li);
     }
   }
