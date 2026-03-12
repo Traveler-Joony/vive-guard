@@ -1,10 +1,18 @@
 import * as vscode from 'vscode';
 import { FileWatcher } from './watcher/fileWatcher';
+import { SidebarProvider } from './ui/sidebarProvider';
 
 let fileWatcher: FileWatcher | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel('VibeGuard');
+
+  const sidebarProvider = new SidebarProvider(context.extensionUri);
+
+  const sidebarRegistration = vscode.window.registerWebviewViewProvider(
+    SidebarProvider.viewType,
+    sidebarProvider,
+  );
 
   fileWatcher = new FileWatcher();
 
@@ -20,6 +28,8 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`    - ${w}`);
       }
     }
+
+    sidebarProvider.update(result);
   });
 
   const refreshCmd = vscode.commands.registerCommand('vibeGuard.refresh', () => {
@@ -30,7 +40,13 @@ export function activate(context: vscode.ExtensionContext) {
     fileWatcher?.analyzeWorkspace();
   });
 
-  context.subscriptions.push(outputChannel, fileWatcher, refreshCmd, analyzeCmd);
+  context.subscriptions.push(
+    outputChannel,
+    sidebarRegistration,
+    fileWatcher,
+    refreshCmd,
+    analyzeCmd,
+  );
 
   // Initial workspace analysis
   fileWatcher.analyzeWorkspace();
