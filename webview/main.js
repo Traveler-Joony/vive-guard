@@ -101,8 +101,100 @@
       setTrend('metric-dependencies', health.trends.dependencies);
     }
 
+    // History chart
+    renderHistoryChart(health.history, color);
+
     // Warnings
     renderWarnings(health.warnings, health);
+  }
+
+  function renderHistoryChart(history, lineColor) {
+    var container = document.getElementById('history-chart');
+    if (!container) return;
+
+    if (!history || history.length < 2) {
+      container.innerHTML = '<div class="chart-empty">Not enough data for trend chart</div>';
+      return;
+    }
+
+    var width = 280;
+    var height = 120;
+    var padLeft = 30;
+    var padRight = 10;
+    var padTop = 10;
+    var padBottom = 20;
+    var plotW = width - padLeft - padRight;
+    var plotH = height - padTop - padBottom;
+
+    // Grade zone bands
+    var zones = [
+      { min: 0, max: 20, color: '#4caf50' },
+      { min: 20, max: 40, color: '#8bc34a' },
+      { min: 40, max: 60, color: '#ffc107' },
+      { min: 60, max: 80, color: '#ff9800' },
+      { min: 80, max: 100, color: '#f44336' },
+    ];
+
+    var bands = '';
+    for (var z = 0; z < zones.length; z++) {
+      var yTop = padTop + plotH * (1 - zones[z].max / 100);
+      var yBot = padTop + plotH * (1 - zones[z].min / 100);
+      bands += '<rect x="' + padLeft + '" y="' + yTop + '" width="' + plotW + '" height="' + (yBot - yTop) + '" fill="' + zones[z].color + '" opacity="0.1"/>';
+    }
+
+    // Y-axis labels
+    var yLabels = '';
+    var yTicks = [0, 20, 40, 60, 80, 100];
+    for (var t = 0; t < yTicks.length; t++) {
+      var yPos = padTop + plotH * (1 - yTicks[t] / 100);
+      yLabels += '<text x="' + (padLeft - 4) + '" y="' + (yPos + 3) + '" text-anchor="end" font-size="9" fill="currentColor" opacity="0.5">' + yTicks[t] + '</text>';
+      yLabels += '<line x1="' + padLeft + '" y1="' + yPos + '" x2="' + (padLeft + plotW) + '" y2="' + yPos + '" stroke="currentColor" stroke-opacity="0.1"/>';
+    }
+
+    // Data points
+    var points = '';
+    var circles = '';
+    var hitAreas = '';
+    var n = history.length;
+    for (var i = 0; i < n; i++) {
+      var x = n === 1 ? padLeft + plotW / 2 : padLeft + (i / (n - 1)) * plotW;
+      var y = padTop + plotH * (1 - history[i].score / 100);
+      points += (i === 0 ? '' : ' ') + x.toFixed(1) + ',' + y.toFixed(1);
+      circles += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="' + lineColor + '" class="chart-dot"/>';
+
+      var time = new Date(history[i].timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      var tooltipText = 'Score: ' + history[i].score.toFixed(1) + ', ' + time;
+      hitAreas += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="10" fill="transparent" data-tooltip="' + tooltipText + '" class="chart-hit"/>';
+    }
+
+    var svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">'
+      + bands
+      + yLabels
+      + '<polyline points="' + points + '" fill="none" stroke="' + lineColor + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+      + circles
+      + hitAreas
+      + '</svg>';
+
+    container.innerHTML = svg + '<div class="chart-tooltip" style="display:none;"></div>';
+
+    // Tooltip events
+    var tooltip = container.querySelector('.chart-tooltip');
+    var hits = container.querySelectorAll('.chart-hit');
+    for (var h = 0; h < hits.length; h++) {
+      hits[h].addEventListener('mouseenter', function (e) {
+        var text = this.getAttribute('data-tooltip');
+        tooltip.textContent = text;
+        tooltip.style.display = 'block';
+      });
+      hits[h].addEventListener('mousemove', function (e) {
+        var rect = container.getBoundingClientRect();
+        tooltip.style.left = (e.clientX - rect.left + 8) + 'px';
+        tooltip.style.top = (e.clientY - rect.top - 24) + 'px';
+      });
+      hits[h].addEventListener('mouseleave', function () {
+        tooltip.style.display = 'none';
+      });
+    }
   }
 
   function getTrendArrow(trend) {

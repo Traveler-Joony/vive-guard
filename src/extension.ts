@@ -53,6 +53,14 @@ export function activate(context: vscode.ExtensionContext) {
     notificationManager.refresh(result);
 
     context.workspaceState.update('vibeGuard.lastHealthScore', result.health);
+
+    // Update score history (max 30 entries)
+    const history = context.workspaceState.get<Array<{ score: number; grade: string; timestamp: number }>>('vibeGuard.scoreHistory', []);
+    history.push({ score: result.health.score, grade: result.health.grade, timestamp: Date.now() });
+    if (history.length > 30) {
+      history.splice(0, history.length - 30);
+    }
+    context.workspaceState.update('vibeGuard.scoreHistory', history);
   });
 
   const refreshCmd = vscode.commands.registerCommand('vibeGuard.refresh', () => {

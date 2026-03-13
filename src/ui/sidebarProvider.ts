@@ -87,9 +87,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _postHealth(result: AnalysisResult, trends?: TrendsData): void {
+    const history = this._workspaceState.get<Array<{ score: number; grade: string; timestamp: number }>>('vibeGuard.scoreHistory', []);
     this._view!.webview.postMessage({
       type: 'UPDATE_HEALTH',
-      payload: { ...result.health, trends },
+      payload: { ...result.health, trends, history },
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
   }
 
@@ -166,9 +167,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       </div>
     </section>
 
+    <section id="history-chart"></section>
+
     <section class="metrics-grid">
       <div class="metric-card" id="metric-complexity">
-        <div class="metric-icon">\u26A1</div>
         <div class="metric-info">
           <div class="metric-title">Complexity</div>
           <div class="metric-value">--</div>
@@ -176,7 +178,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         </div>
       </div>
       <div class="metric-card" id="metric-duplication">
-        <div class="metric-icon">\uD83D\uDCCB</div>
         <div class="metric-info">
           <div class="metric-title">Duplication</div>
           <div class="metric-value">--</div>
@@ -184,7 +185,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         </div>
       </div>
       <div class="metric-card" id="metric-patterns">
-        <div class="metric-icon">\uD83D\uDCD0</div>
         <div class="metric-info">
           <div class="metric-title">Patterns</div>
           <div class="metric-value">--</div>
@@ -192,7 +192,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         </div>
       </div>
       <div class="metric-card" id="metric-dependencies">
-        <div class="metric-icon">\uD83D\uDD17</div>
         <div class="metric-info">
           <div class="metric-title">Dependencies</div>
           <div class="metric-value">--</div>
