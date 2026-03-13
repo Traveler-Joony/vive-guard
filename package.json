@@ -1,7 +1,7 @@
 {
   "name": "viveguard",
   "publisher": "traveler-joony",
-  "displayName": "VibeGuard",
+  "displayName": "VibeGuard Code",
   "version": "0.1.0",
   "description": "Monitor code complexity in real-time for vibe coding projects",
   "main": "./dist/extension.js",
