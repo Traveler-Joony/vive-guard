@@ -30,7 +30,8 @@
   const dependenciesDetail = /** @type {HTMLElement} */ (document.querySelector('#metric-dependencies .metric-detail'));
 
   const warningsList = /** @type {HTMLUListElement} */ (document.querySelector('.warnings-list'));
-  const filesList = /** @type {HTMLUListElement} */ (document.querySelector('.files-list'));
+  const highComplexityList = /** @type {HTMLUListElement} */ (document.querySelector('.high-complexity-list'));
+  const fileTreeContainer = /** @type {HTMLElement} */ (document.querySelector('.file-tree'));
 
   const refreshBtn = /** @type {HTMLButtonElement} */ (document.getElementById('refresh-btn'));
 
@@ -47,7 +48,8 @@
         renderHealth(message.payload);
         break;
       case 'UPDATE_FILES':
-        renderFiles(message.payload);
+        renderHighComplexity(message.payload.files);
+        renderFileTree(message.payload.files, message.payload.workspaceRoot);
         break;
     }
   });
@@ -281,6 +283,9 @@
 
       var prompt = getPromptForWarning(warnings[i], health);
       if (prompt) {
+        var tooltipWrapper = document.createElement('span');
+        tooltipWrapper.className = 'prompt-tooltip-wrapper';
+
         var btn = document.createElement('button');
         btn.className = 'copy-prompt-btn';
         btn.textContent = 'Copy AI Prompt';
@@ -296,43 +301,89 @@
             }, 1500);
           });
         });
-        li.appendChild(btn);
+
+        var tooltipText = document.createElement('span');
+        tooltipText.className = 'prompt-tooltip-text';
+        tooltipText.textContent = prompt;
+
+        tooltipWrapper.appendChild(btn);
+        tooltipWrapper.appendChild(tooltipText);
+
+        // Delayed tooltip show on hover
+        (function (wrapEl, tipEl) {
+          var timer = null;
+          wrapEl.addEventListener('mouseenter', function () {
+            timer = setTimeout(function () {
+              tipEl.style.display = 'block';
+            }, 300);
+          });
+          wrapEl.addEventListener('mouseleave', function () {
+            if (timer) { clearTimeout(timer); timer = null; }
+            tipEl.style.display = 'none';
+          });
+        })(tooltipWrapper, tooltipText);
+
+        li.appendChild(tooltipWrapper);
       }
 
       warningsList.appendChild(li);
     }
   }
 
-  function renderFiles(files) {
-    filesList.innerHTML = '';
-    if (files.length === 0) {
+  // ── High Complexity Functions ──
+
+  function renderHighComplexity(files) {
+    highComplexityList.innerHTML = '';
+
+    // Flatten all functions with their parent file info
+    var highFuncs = [];
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      var funcs = file.functions || [];
+      for (var j = 0; j < funcs.length; j++) {
+        if (funcs[j].complexity > 10) {
+          highFuncs.push({
+            name: funcs[j].name,
+            complexity: funcs[j].complexity,
+            filePath: file.filePath,
+            fileName: file.filePath.replace(/\\/g, '/').split('/').pop(),
+          });
+        }
+      }
+    }
+
+    if (highFuncs.length === 0) {
       var li = document.createElement('li');
-      li.className = 'files-empty';
-      li.textContent = 'No files analyzed yet.';
-      filesList.appendChild(li);
+      li.className = 'high-complexity-empty';
+      li.textContent = 'No high-complexity functions found.';
+      highComplexityList.appendChild(li);
       return;
     }
 
-    var sorted = files.slice().sort(function (a, b) { return b.max - a.max; });
+    highFuncs.sort(function (a, b) { return b.complexity - a.complexity; });
 
-    for (var i = 0; i < sorted.length; i++) {
-      var file = sorted[i];
+    for (var k = 0; k < highFuncs.length; k++) {
+      var fn = highFuncs[k];
       var li = document.createElement('li');
-      li.className = 'file-item';
+      li.className = 'high-complexity-item';
+      li.setAttribute('data-path', fn.filePath);
 
-      var nameSpan = document.createElement('span');
-      nameSpan.className = 'file-name';
-      nameSpan.textContent = shortenPath(file.filePath);
-      nameSpan.title = file.filePath;
+      var funcSpan = document.createElement('span');
+      funcSpan.className = 'high-complexity-func';
+      funcSpan.textContent = fn.name;
 
-      var complexitySpan = document.createElement('span');
-      complexitySpan.className = 'file-complexity ' + getComplexityClass(file.max);
-      complexitySpan.textContent = String(file.max);
+      var fileSpan = document.createElement('span');
+      fileSpan.className = 'high-complexity-file';
+      fileSpan.textContent = '(' + fn.fileName + ')';
 
-      li.appendChild(nameSpan);
-      li.appendChild(complexitySpan);
+      var valSpan = document.createElement('span');
+      valSpan.className = 'high-complexity-val ' + getComplexityClass(fn.complexity);
+      valSpan.textContent = String(fn.complexity);
 
-      li.setAttribute('data-path', file.filePath);
+      li.appendChild(funcSpan);
+      li.appendChild(fileSpan);
+      li.appendChild(valSpan);
+
       li.addEventListener('click', function () {
         vscode.postMessage({
           type: 'OPEN_FILE',
@@ -340,20 +391,242 @@
         });
       });
 
-      filesList.appendChild(li);
+      highComplexityList.appendChild(li);
     }
   }
 
-  function shortenPath(filePath) {
-    var parts = filePath.replace(/\\/g, '/').split('/');
-    return parts.length > 3
-      ? '.../' + parts.slice(-3).join('/')
-      : parts.join('/');
+  // ── File Tree ──
+
+  // @ts-ignore
+  var iconsBaseUri = window.iconsBaseUri || '';
+
+  function getFileIconSvg(filename) {
+    // Test files first (before extension check)
+    if (/\.(test|spec)\.(ts|js|tsx|jsx)$/.test(filename)) return 'test-ts.svg';
+    // Special filenames
+    if (filename === 'Dockerfile') return 'docker.svg';
+    if (filename === '.gitignore') return 'git.svg';
+
+    var ext = filename.lastIndexOf('.') !== -1 ? filename.slice(filename.lastIndexOf('.')) : '';
+    var map = {
+      '.ts': 'typescript.svg', '.tsx': 'react_ts.svg',
+      '.js': 'javascript.svg', '.jsx': 'react.svg',
+      '.py': 'python.svg', '.java': 'java.svg', '.kt': 'kotlin.svg', '.swift': 'swift.svg',
+      '.go': 'go.svg', '.rs': 'rust.svg', '.rb': 'ruby.svg', '.php': 'php.svg',
+      '.c': 'c.svg', '.cpp': 'cpp.svg', '.cc': 'cpp.svg', '.cs': 'csharp.svg',
+      '.dart': 'dart.svg', '.lua': 'lua.svg', '.r': 'r.svg', '.scala': 'scala.svg', '.zig': 'zig.svg',
+      '.html': 'html.svg', '.css': 'css.svg', '.scss': 'sass.svg', '.less': 'less.svg',
+      '.vue': 'vue.svg', '.svelte': 'svelte.svg', '.astro': 'astro.svg',
+      '.json': 'json.svg', '.yaml': 'yaml.svg', '.yml': 'yaml.svg', '.toml': 'toml.svg', '.xml': 'xml.svg',
+      '.env': 'tune.svg', '.ini': 'tune.svg', '.csv': 'csv.svg',
+      '.md': 'markdown.svg', '.txt': 'document.svg', '.pdf': 'pdf.svg',
+      '.sh': 'terminal.svg', '.bash': 'terminal.svg', '.sql': 'database.svg',
+      '.graphql': 'graphql.svg', '.gql': 'graphql.svg', '.prisma': 'prisma.svg',
+      '.svg': 'svg.svg',
+      '.png': 'image.svg', '.jpg': 'image.svg', '.jpeg': 'image.svg', '.gif': 'image.svg', '.webp': 'image.svg', '.ico': 'image.svg',
+      '.mp3': 'audio.svg', '.wav': 'audio.svg', '.ogg': 'audio.svg',
+      '.mp4': 'video.svg', '.mov': 'video.svg', '.avi': 'video.svg',
+      '.zip': 'zip.svg', '.tar': 'zip.svg', '.gz': 'zip.svg', '.rar': 'zip.svg',
+      '.lock': 'lock.svg',
+    };
+    return map[ext] || 'file.svg';
+  }
+
+  function getComplexityEmoji(complexity) {
+    if (complexity <= 10) return '\u2705';
+    if (complexity <= 20) return '\u26A0\uFE0F';
+    return '\uD83D\uDD34';
+  }
+
+  function buildTree(files, workspaceRoot) {
+    var root = { name: '', children: {}, files: [] };
+    var normalizedRoot = workspaceRoot.replace(/\\/g, '/').replace(/\/$/, '');
+
+    for (var i = 0; i < files.length; i++) {
+      var absPath = files[i].filePath.replace(/\\/g, '/');
+      var relPath = absPath;
+      if (normalizedRoot && absPath.indexOf(normalizedRoot) === 0) {
+        relPath = absPath.slice(normalizedRoot.length + 1);
+      }
+
+      var parts = relPath.split('/');
+      var node = root;
+
+      // Navigate/create folder nodes for all but the last part (filename)
+      for (var j = 0; j < parts.length - 1; j++) {
+        if (!node.children[parts[j]]) {
+          node.children[parts[j]] = { name: parts[j], children: {}, files: [] };
+        }
+        node = node.children[parts[j]];
+      }
+
+      // Add file to the leaf folder
+      node.files.push({
+        name: parts[parts.length - 1],
+        max: files[i].max,
+        filePath: files[i].filePath,
+        functions: files[i].functions || [],
+      });
+    }
+
+    return root;
+  }
+
+  function renderFileTree(files, workspaceRoot) {
+    fileTreeContainer.innerHTML = '';
+
+    if (files.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'high-complexity-empty';
+      empty.textContent = 'No files analyzed yet.';
+      fileTreeContainer.appendChild(empty);
+      return;
+    }
+
+    var tree = buildTree(files, workspaceRoot);
+    renderTreeNode(tree, fileTreeContainer, -1);
+  }
+
+  function renderTreeNode(node, container, depth) {
+    // Sort children: folders first (alphabetical), then files (alphabetical)
+    var folderNames = Object.keys(node.children).sort();
+    var sortedFiles = node.files.slice().sort(function (a, b) {
+      return a.name.localeCompare(b.name);
+    });
+
+    // Render folders
+    for (var i = 0; i < folderNames.length; i++) {
+      var childNode = node.children[folderNames[i]];
+      var folderDepth = depth + 1;
+      var isExpanded = folderDepth === 0; // First level expanded by default
+
+      var folderEl = document.createElement('div');
+      folderEl.className = 'tree-folder';
+
+      var row = document.createElement('div');
+      row.className = 'tree-row';
+      row.style.paddingLeft = (depth * 16) + 'px';
+
+      var arrow = document.createElement('span');
+      arrow.className = 'tree-arrow';
+      arrow.textContent = isExpanded ? '\u25BC' : '\u25B6';
+
+      var folderIcon = document.createElement('img');
+      folderIcon.className = 'tree-icon-img';
+      folderIcon.src = iconsBaseUri + '/' + (isExpanded ? 'folder-open.svg' : 'folder.svg');
+      folderIcon.width = 16;
+      folderIcon.height = 16;
+
+      var label = document.createElement('span');
+      label.className = 'tree-label';
+      label.textContent = folderNames[i];
+
+      row.appendChild(arrow);
+      row.appendChild(folderIcon);
+      row.appendChild(label);
+
+      var childrenContainer = document.createElement('div');
+      childrenContainer.className = 'tree-children' + (isExpanded ? ' expanded' : '');
+
+      // Toggle handler
+      (function (arrowEl, iconEl, childrenEl) {
+        arrowEl.parentElement.addEventListener('click', function () {
+          var open = childrenEl.classList.toggle('expanded');
+          arrowEl.textContent = open ? '\u25BC' : '\u25B6';
+          iconEl.src = iconsBaseUri + '/' + (open ? 'folder-open.svg' : 'folder.svg');
+        });
+      })(arrow, folderIcon, childrenContainer);
+
+      folderEl.appendChild(row);
+      folderEl.appendChild(childrenContainer);
+      container.appendChild(folderEl);
+
+      // Recurse
+      renderTreeNode(childNode, childrenContainer, folderDepth);
+    }
+
+    // Render files
+    for (var f = 0; f < sortedFiles.length; f++) {
+      var file = sortedFiles[f];
+      var fileDepth = depth + 1;
+      var iconSvg = getFileIconSvg(file.name);
+
+      var wrapper = document.createElement('div');
+      wrapper.className = 'tree-file-wrapper';
+
+      var fileRow = document.createElement('div');
+      fileRow.className = 'tree-row tree-file-row';
+      fileRow.style.paddingLeft = (fileDepth * 16) + 'px';
+      fileRow.setAttribute('data-path', file.filePath);
+
+      var spacer = document.createElement('span');
+      spacer.className = 'tree-arrow';
+      spacer.textContent = '';
+
+      var fileIcon = document.createElement('img');
+      fileIcon.className = 'tree-icon-img';
+      fileIcon.src = iconsBaseUri + '/' + iconSvg;
+      fileIcon.width = 16;
+      fileIcon.height = 16;
+
+      var fileLabel = document.createElement('span');
+      fileLabel.className = 'tree-label';
+      fileLabel.textContent = file.name;
+
+      var complexityBadge = document.createElement('span');
+      complexityBadge.className = 'tree-complexity ' + getComplexityClass(file.max);
+      complexityBadge.textContent = String(file.max);
+
+      fileRow.appendChild(spacer);
+      fileRow.appendChild(fileIcon);
+      fileRow.appendChild(fileLabel);
+      fileRow.appendChild(complexityBadge);
+
+      fileRow.addEventListener('click', function () {
+        vscode.postMessage({
+          type: 'OPEN_FILE',
+          payload: { path: this.getAttribute('data-path') },
+        });
+      });
+
+      wrapper.appendChild(fileRow);
+
+      // File hover tooltip with function list
+      (function (wrapperEl, fileData) {
+        var tooltip = null;
+        var hoverTimer = null;
+        wrapperEl.addEventListener('mouseenter', function (e) {
+          if (tooltip) return;
+          hoverTimer = setTimeout(function () {
+            tooltip = document.createElement('div');
+            tooltip.className = 'file-tooltip';
+            if (fileData.functions.length === 0) {
+              tooltip.textContent = 'No functions';
+            } else {
+              var lines = [];
+              for (var g = 0; g < fileData.functions.length; g++) {
+                var fn = fileData.functions[g];
+                lines.push(fn.name + ': ' + fn.complexity + ' ' + getComplexityEmoji(fn.complexity));
+              }
+              tooltip.textContent = lines.join('\n');
+            }
+            wrapperEl.appendChild(tooltip);
+            // Force display since we're managing via JS
+            tooltip.style.display = 'block';
+          }, 300);
+        });
+        wrapperEl.addEventListener('mouseleave', function () {
+          if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+          if (tooltip) { wrapperEl.removeChild(tooltip); tooltip = null; }
+        });
+      })(wrapper, file);
+
+      container.appendChild(wrapper);
+    }
   }
 
   function getComplexityClass(complexity) {
-    if (complexity <= 5) return 'complexity-low';
-    if (complexity <= 10) return 'complexity-med';
+    if (complexity <= 10) return 'complexity-low';
     if (complexity <= 20) return 'complexity-high';
     return 'complexity-critical';
   }

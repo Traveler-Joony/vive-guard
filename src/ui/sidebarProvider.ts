@@ -95,10 +95,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _postFiles(result: AnalysisResult): void {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     this._view!.webview.postMessage({
       type: 'UPDATE_FILES',
-      payload: result.files,
-    });
+      payload: { files: result.files, workspaceRoot },
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
   }
 
   private _computeTrends(current: HealthScore): TrendsData | undefined {
@@ -142,6 +143,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'main.js'),
     );
+    const iconsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, 'webview', 'icons'),
+    );
     const nonce = getNonce();
 
     return `<!DOCTYPE html>
@@ -150,7 +154,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource};">
   <link href="${styleUri}" rel="stylesheet">
   <title>VibeGuard Dashboard</title>
 </head>
@@ -206,12 +210,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     </section>
 
     <section class="files-section">
-      <h3>Files by Complexity</h3>
-      <ul class="files-list"></ul>
+      <h3>High Complexity</h3>
+      <ul class="high-complexity-list"></ul>
+    </section>
+
+    <section class="files-section">
+      <h3>Project Files</h3>
+      <div class="file-tree"></div>
     </section>
 
     <button class="refresh-btn" id="refresh-btn">Refresh Analysis</button>
   </div>
+  <script nonce="${nonce}">window.iconsBaseUri = "${iconsUri}";</script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
