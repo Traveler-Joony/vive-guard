@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { AnalysisResult, HealthScore } from '../shared/types';
 import type { Message } from '../shared/messages';
+import { t, setLanguage, getTranslationsForWebview, getStoredLanguagePref } from '../config/i18n';
 
 interface MetricTrend {
   direction: 'up' | 'down' | 'stable';
@@ -46,7 +47,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    webviewView.webview.onDidReceiveMessage((message: Message) => {
+    webviewView.webview.onDidReceiveMessage((message: Message & { type: string; payload?: any }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       switch (message.type) {
         case 'REQUEST_REFRESH':
           vscode.commands.executeCommand('vibeGuard.refresh');
@@ -57,6 +58,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           vscode.workspace.openTextDocument(uri).then((doc) => {
             vscode.window.showTextDocument(doc);
           });
+          break;
+        }
+        case 'CHANGE_LANGUAGE': {
+          setLanguage(message.payload.language, this._workspaceState);
+          webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+          vscode.commands.executeCommand('vibeGuard.refresh');
           break;
         }
       }
@@ -90,7 +97,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const history = this._workspaceState.get<Array<{ score: number; grade: string; timestamp: number }>>('vibeGuard.scoreHistory', []);
     this._view!.webview.postMessage({
       type: 'UPDATE_HEALTH',
-      payload: { ...result.health, trends, history },
+      payload: { ...result.health, trends, history, translations: getTranslationsForWebview() },
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
   }
 
@@ -147,6 +154,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, 'webview', 'icons'),
     );
     const nonce = getNonce();
+    const langPref = getStoredLanguagePref(this._workspaceState);
+
+    const langOptions = [
+      { value: 'auto', label: 'Auto' },
+      { value: 'en', label: 'English' },
+      { value: 'ko', label: '\uD55C\uAD6D\uC5B4' },
+      { value: 'ja', label: '\u65E5\u672C\u8A9E' },
+      { value: 'zh-cn', label: '\u7B80\u4F53\u4E2D\u6587' },
+      { value: 'zh-tw', label: '\u7E41\u9AD4\u4E2D\u6587' },
+      { value: 'de', label: 'Deutsch' },
+      { value: 'fr', label: 'Fran\u00E7ais' },
+      { value: 'es', label: 'Espa\u00F1ol' },
+      { value: 'pt', label: 'Portugu\u00EAs' },
+      { value: 'ru', label: '\u0420\u0443\u0441\u0441\u043A\u0438\u0439' },
+    ];
+    const optionsHtml = langOptions.map((o) =>
+      `<option value="${o.value}"${o.value === langPref ? ' selected' : ''}>${o.label}</option>`,
+    ).join('');
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -176,28 +201,28 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     <section class="metrics-grid">
       <div class="metric-card" id="metric-complexity">
         <div class="metric-info">
-          <div class="metric-title">Complexity</div>
+          <div class="metric-title">${t('dashboard.complexity')}</div>
           <div class="metric-value">--</div>
           <div class="metric-detail"></div>
         </div>
       </div>
       <div class="metric-card" id="metric-duplication">
         <div class="metric-info">
-          <div class="metric-title">Duplication</div>
+          <div class="metric-title">${t('dashboard.duplication')}</div>
           <div class="metric-value">--</div>
           <div class="metric-detail"></div>
         </div>
       </div>
       <div class="metric-card" id="metric-patterns">
         <div class="metric-info">
-          <div class="metric-title">Patterns</div>
+          <div class="metric-title">${t('dashboard.patterns')}</div>
           <div class="metric-value">--</div>
           <div class="metric-detail"></div>
         </div>
       </div>
       <div class="metric-card" id="metric-dependencies">
         <div class="metric-info">
-          <div class="metric-title">Dependencies</div>
+          <div class="metric-title">${t('dashboard.dependencies')}</div>
           <div class="metric-value">--</div>
           <div class="metric-detail"></div>
         </div>
@@ -205,21 +230,26 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     </section>
 
     <section class="warnings-section">
-      <h3>Warnings</h3>
+      <h3>${t('dashboard.warnings')}</h3>
       <ul class="warnings-list"></ul>
     </section>
 
     <section class="files-section">
-      <h3>High Complexity</h3>
+      <h3>${t('dashboard.highComplexity')}</h3>
       <ul class="high-complexity-list"></ul>
     </section>
 
     <section class="files-section">
-      <h3>Project Files</h3>
+      <h3>${t('dashboard.projectFiles')}</h3>
       <div class="file-tree"></div>
     </section>
 
-    <button class="refresh-btn" id="refresh-btn">Refresh Analysis</button>
+    <button class="refresh-btn" id="refresh-btn">${t('dashboard.refreshAnalysis')}</button>
+
+    <div class="language-selector">
+      <label>${t('dashboard.language')}</label>
+      <select id="language-select">${optionsHtml}</select>
+    </div>
   </div>
   <script nonce="${nonce}">window.iconsBaseUri = "${iconsUri}";</script>
   <script nonce="${nonce}" src="${scriptUri}"></script>

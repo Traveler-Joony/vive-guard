@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { calculateHealth } from '../analyzer/healthScorer';
+import { t } from '../config/i18n';
 import { AnalysisResult } from '../shared/types';
 
 const DEBOUNCE_MS = 500;
@@ -34,7 +35,7 @@ export class FileWatcher implements vscode.Disposable {
       return;
     }
 
-    const result = calculateHealth(filePaths);
+    const result = calculateHealth(filePaths, t);
     this._callback?.(result);
   }
 

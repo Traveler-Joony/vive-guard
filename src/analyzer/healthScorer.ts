@@ -56,14 +56,39 @@ export function getGrade(score: number): HealthGrade {
   return 'F';
 }
 
+type TranslateFn = (key: string, vars?: Record<string, string>) => string;
+
+const defaultT: TranslateFn = (key, vars) => {
+  const defaults: Record<string, string> = {
+    'warning.highComplexity': '"{name}" has high complexity and may be hard to maintain.',
+    'warning.duplicated': 'About {rate}% of the code appears to be duplicated. Consider reusing shared logic.',
+    'warning.inconsistentPatterns': 'Coding styles are inconsistent across files. Aligning on a single style improves readability.',
+    'warning.circular': 'Some files depend on each other in a circular way, which can cause unexpected issues.',
+  };
+  let text = defaults[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+    }
+  }
+  return text;
+};
+
+interface WarningsResult {
+  warnings: string[];
+  warningKeys: string[];
+}
+
 function generateWarnings(
   complexityScore: number,
   files: FileComplexity[],
   duplication: DuplicationResult,
   patternScore: number,
   dependencies: DependencyGraph,
-): string[] {
+  t: TranslateFn = defaultT,
+): WarningsResult {
   const warnings: string[] = [];
+  const warningKeys: string[] = [];
 
   // High complexity — top 3 files
   if (complexityScore > 40) {
@@ -71,38 +96,34 @@ function generateWarnings(
     const top = sorted.slice(0, 3);
     for (const f of top) {
       const name = f.filePath.split('/').pop() ?? f.filePath;
-      warnings.push(
-        `"${name}" has high complexity and may be hard to maintain.`,
-      );
+      warnings.push(t('warning.highComplexity', { name }));
+      warningKeys.push('warning.highComplexity');
     }
   }
 
   // High duplication
   if (duplication.duplicationRate > 0.1) {
-    const pct = Math.round(duplication.duplicationRate * 100);
-    warnings.push(
-      `About ${pct}% of the code appears to be duplicated. Consider reusing shared logic.`,
-    );
+    const pct = String(Math.round(duplication.duplicationRate * 100));
+    warnings.push(t('warning.duplicated', { rate: pct }));
+    warningKeys.push('warning.duplicated');
   }
 
   // Pattern inconsistency
   if (patternScore > 40) {
-    warnings.push(
-      'Coding styles are inconsistent across files. Aligning on a single style improves readability.',
-    );
+    warnings.push(t('warning.inconsistentPatterns'));
+    warningKeys.push('warning.inconsistentPatterns');
   }
 
   // Circular dependencies
   if (dependencies.cycles.length > 0) {
-    warnings.push(
-      'Some files depend on each other in a circular way, which can cause unexpected issues.',
-    );
+    warnings.push(t('warning.circular'));
+    warningKeys.push('warning.circular');
   }
 
-  return warnings;
+  return { warnings, warningKeys };
 }
 
-export function calculateHealth(filePaths: string[]): AnalysisResult {
+export function calculateHealth(filePaths: string[], t?: TranslateFn): AnalysisResult {
   const complexity = analyzeComplexity(filePaths);
   const duplication = detectDuplication(filePaths);
   const patterns = checkPatterns(filePaths);
@@ -120,12 +141,13 @@ export function calculateHealth(filePaths: string[]): AnalysisResult {
     depScore * WEIGHTS.dependencies;
 
   const grade = getGrade(score);
-  const warnings = generateWarnings(
+  const { warnings, warningKeys } = generateWarnings(
     cScore,
     complexity,
     duplication,
     pScore,
     dependencies,
+    t,
   );
 
   return {
@@ -137,6 +159,7 @@ export function calculateHealth(filePaths: string[]): AnalysisResult {
       patterns,
       dependencies,
       warnings,
+      warningKeys,
     },
     files: complexity,
     duplication,

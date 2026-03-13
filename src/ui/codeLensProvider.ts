@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../config/i18n';
 import { AnalysisResult, FunctionComplexity } from '../shared/types';
 
 export class VibeGuardCodeLensProvider implements vscode.CodeLensProvider {
@@ -27,7 +28,7 @@ export class VibeGuardCodeLensProvider implements vscode.CodeLensProvider {
         fn.complexity <= 10 ? '✅' : fn.complexity <= 20 ? '⚠️' : '🔴';
 
       return new vscode.CodeLens(range, {
-        title: `Complexity: ${fn.complexity} ${icon}`,
+        title: t('codelens.complexity', { value: String(fn.complexity), icon }),
         command: 'editor.action.goToLocations',
         arguments: [
           document.uri,

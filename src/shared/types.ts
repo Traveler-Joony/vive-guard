@@ -92,6 +92,7 @@ export interface HealthScore {
   patterns: PatternConsistencyResult;
   dependencies: DependencyGraph;
   warnings: string[];
+  warningKeys?: string[];
 }
 
 // ── Analysis Result ──

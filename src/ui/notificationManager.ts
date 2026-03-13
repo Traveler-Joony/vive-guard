@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../config/i18n';
 import type { AnalysisResult, HealthGrade, HealthScore } from '../shared/types';
 
 export class NotificationManager implements vscode.Disposable {
@@ -18,8 +19,8 @@ export class NotificationManager implements vscode.Disposable {
       const delta = score - this._lastScore;
       if (delta >= 10) {
         vscode.window.showWarningMessage(
-          'VibeGuard: Your project complexity increased significantly. Consider committing your current working state before making more changes.',
-          'Got it',
+          t('notification.complexityIncreased'),
+          t('notification.gotIt'),
         );
       }
     }
@@ -36,14 +37,16 @@ export class NotificationManager implements vscode.Disposable {
       return;
     }
 
-    const message = `VibeGuard: Code health dropped to grade ${grade} (${score.toFixed(1)}/100).`;
+    const message = t('notification.healthDropped', { grade, score: score.toFixed(1) });
+    const showDashboard = t('notification.showDashboard');
+    const dismiss = t('notification.dismiss');
     const showFn =
       score > 60
         ? vscode.window.showErrorMessage
         : vscode.window.showWarningMessage;
 
-    showFn(message, 'Show Dashboard', 'Dismiss').then((action) => {
-      if (action === 'Show Dashboard') {
+    showFn(message, showDashboard, dismiss).then((action) => {
+      if (action === showDashboard) {
         vscode.commands.executeCommand('vibeGuard.dashboard.focus');
       }
     });

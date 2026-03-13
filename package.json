@@ -89,6 +89,12 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Maximum coupling index (0.0–1.0) allowed for file dependencies."
+        },
+        "vibeGuard.language": {
+          "type": "string",
+          "enum": ["auto", "en", "ko", "ja", "zh-cn", "zh-tw", "de", "fr", "es", "pt", "ru"],
+          "default": "auto",
+          "description": "Display language for VibeGuard UI."
         }
       }
     }

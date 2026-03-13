@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { t } from '../config/i18n';
 import { AnalysisResult } from '../shared/types';
 
 export class DiagnosticsProvider {
@@ -36,8 +37,8 @@ export class DiagnosticsProvider {
             : vscode.DiagnosticSeverity.Error;
 
         const threshold = fn.complexity <= 20 ? 10 : 20;
-        const level = fn.complexity <= 20 ? 'complexity' : 'high complexity';
-        const message = `Function '${fn.name}' has ${level} ${fn.complexity} (threshold: ${threshold})`;
+        const msgKey = fn.complexity <= 20 ? 'diagnostics.complexity' : 'diagnostics.highComplexity';
+        const message = t(msgKey, { name: fn.name, value: String(fn.complexity), threshold: String(threshold) });
 
         const diagnostic = new vscode.Diagnostic(range, message, severity);
         diagnostic.source = 'VibeGuard';

@@ -407,3 +407,28 @@ body {
 .trend-up { color: #f44336; }
 .trend-down { color: #4caf50; }
 .trend-stable { color: var(--vscode-descriptionForeground); }
+
+/* ── Language Selector ── */
+
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.language-selector label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.language-selector select {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid var(--vscode-editorWidget-border, #333);
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  cursor: pointer;
+}

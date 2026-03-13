@@ -4,10 +4,13 @@ import { SidebarProvider } from './ui/sidebarProvider';
 import { VibeGuardCodeLensProvider } from './ui/codeLensProvider';
 import { DiagnosticsProvider } from './ui/diagnosticsProvider';
 import { NotificationManager } from './ui/notificationManager';
+import { initLanguage } from './config/i18n';
 
 let fileWatcher: FileWatcher | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+  initLanguage(context.workspaceState);
+
   const outputChannel = vscode.window.createOutputChannel('VibeGuard');
 
   const sidebarProvider = new SidebarProvider(context.extensionUri, context.workspaceState);

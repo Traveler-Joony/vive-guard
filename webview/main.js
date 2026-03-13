@@ -6,6 +6,10 @@
 
   const CIRCUMFERENCE = 2 * Math.PI * 52; // ~326.73
 
+  // ── i18n ──
+  var _translations = {};
+  function tr(key) { return _translations[key] || key; }
+
   const GRADE_COLORS = {
     A: '#4caf50',
     B: '#8bc34a',
@@ -41,10 +45,20 @@
     vscode.postMessage({ type: 'REQUEST_REFRESH' });
   });
 
+  var languageSelect = document.getElementById('language-select');
+  if (languageSelect) {
+    languageSelect.addEventListener('change', function () {
+      vscode.postMessage({ type: 'CHANGE_LANGUAGE', payload: { language: this.value } });
+    });
+  }
+
   window.addEventListener('message', function (event) {
     var message = event.data;
     switch (message.type) {
       case 'UPDATE_HEALTH':
+        if (message.payload.translations) {
+          _translations = message.payload.translations;
+        }
         renderHealth(message.payload);
         break;
       case 'UPDATE_FILES':
@@ -78,21 +92,21 @@
       ? Math.max.apply(null, health.complexity.map(function (f) { return f.max; }))
       : 0;
     complexityValue.textContent = avgComplexity.toFixed(1);
-    complexityDetail.textContent = 'max ' + maxComplexity;
+    complexityDetail.textContent = tr('dashboard.max') + ' ' + maxComplexity;
 
     // Duplication
     var dupPct = (health.duplication.duplicationRate * 100).toFixed(1);
     duplicationValue.textContent = dupPct + '%';
-    duplicationDetail.textContent = health.duplication.blocks.length + ' blocks';
+    duplicationDetail.textContent = health.duplication.blocks.length + ' ' + tr('dashboard.blocks');
 
     // Patterns
     var patPct = (health.patterns.overallConsistency * 100).toFixed(0);
     patternsValue.textContent = patPct + '%';
-    patternsDetail.textContent = health.patterns.patterns.length + ' rules';
+    patternsDetail.textContent = health.patterns.patterns.length + ' ' + tr('dashboard.rules');
 
     // Dependencies
     dependenciesValue.textContent = health.dependencies.couplingIndex.toFixed(2);
-    dependenciesDetail.textContent = health.dependencies.cycles.length + ' cycles';
+    dependenciesDetail.textContent = health.dependencies.cycles.length + ' ' + tr('dashboard.cycles');
 
     // Trends
     if (health.trends) {
@@ -107,7 +121,7 @@
     renderHistoryChart(health.history, color);
 
     // Warnings
-    renderWarnings(health.warnings, health);
+    renderWarnings(health.warnings, health.warningKeys, health);
   }
 
   function renderHistoryChart(history, lineColor) {
@@ -115,7 +129,7 @@
     if (!container) return;
 
     if (!history || history.length < 2) {
-      container.innerHTML = '<div class="chart-empty">Not enough data for trend chart</div>';
+      container.innerHTML = '<div class="chart-empty">' + tr('dashboard.notEnoughData') + '</div>';
       return;
     }
 
@@ -165,7 +179,7 @@
       circles += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="' + lineColor + '" class="chart-dot"/>';
 
       var time = new Date(history[i].timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      var tooltipText = 'Score: ' + history[i].score.toFixed(1) + ', ' + time;
+      var tooltipText = tr('dashboard.score') + ': ' + history[i].score.toFixed(1) + ', ' + time;
       hitAreas += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="10" fill="transparent" data-tooltip="' + tooltipText + '" class="chart-hit"/>';
     }
 
@@ -229,47 +243,46 @@
     el.className = 'metric-trend trend-' + trend.direction;
   }
 
-  function getPromptForWarning(warning, health) {
-    // High complexity — extract filename from ""{name}" has high complexity..."
-    if (warning.indexOf('high complexity') !== -1) {
-      var match = warning.match(/"([^"]+)"/);
-      var filename = match ? match[1] : 'this file';
-      return 'Split ' + filename + ' into smaller functions. Each function should do one thing.';
-    }
-    // Duplication
-    if (warning.indexOf('duplicated') !== -1) {
-      var blocks = health.duplication.blocks;
-      if (blocks.length > 0) {
-        var src = blocks[0].sourceFile.split('/').pop();
-        var tgt = blocks[0].targetFile.split('/').pop();
-        return 'Extract the duplicated code between ' + src + ' and ' + tgt + ' into a shared utility.';
+  function getPromptForWarning(warningKey, warningText, health) {
+    switch (warningKey) {
+      case 'warning.highComplexity': {
+        var match = warningText.match(/"([^"]+)"/);
+        var filename = match ? match[1] : 'this file';
+        return 'Split ' + filename + ' into smaller functions. Each function should do one thing.';
       }
-      return 'Extract the duplicated code between files into a shared utility.';
-    }
-    // Pattern inconsistency
-    if (warning.indexOf('inconsistent') !== -1 || warning.indexOf('Inconsistent') !== -1) {
-      var patterns = health.patterns.patterns;
-      var dominant = patterns.length > 0 ? patterns[0].dominant : 'a consistent';
-      return 'Standardize error handling across all files to use ' + dominant + ' pattern.';
-    }
-    // Circular dependencies
-    if (warning.indexOf('circular') !== -1) {
-      var cycles = health.dependencies.cycles;
-      if (cycles.length > 0) {
-        var files = cycles[0].files.map(function (f) { return f.split('/').pop(); }).join(', ');
-        return 'Remove circular dependency between ' + files + '. Extract shared logic into a separate module.';
+      case 'warning.duplicated': {
+        var blocks = health.duplication.blocks;
+        if (blocks.length > 0) {
+          var src = blocks[0].sourceFile.split('/').pop();
+          var tgt = blocks[0].targetFile.split('/').pop();
+          return 'Extract the duplicated code between ' + src + ' and ' + tgt + ' into a shared utility.';
+        }
+        return 'Extract the duplicated code between files into a shared utility.';
       }
-      return 'Remove circular dependency between files. Extract shared logic into a separate module.';
+      case 'warning.inconsistentPatterns': {
+        var patterns = health.patterns.patterns;
+        var dominant = patterns.length > 0 ? patterns[0].dominant : 'a consistent';
+        return 'Standardize error handling across all files to use ' + dominant + ' pattern.';
+      }
+      case 'warning.circular': {
+        var cycles = health.dependencies.cycles;
+        if (cycles.length > 0) {
+          var files = cycles[0].files.map(function (f) { return f.split('/').pop(); }).join(', ');
+          return 'Remove circular dependency between ' + files + '. Extract shared logic into a separate module.';
+        }
+        return 'Remove circular dependency between files. Extract shared logic into a separate module.';
+      }
+      default:
+        return null;
     }
-    return null;
   }
 
-  function renderWarnings(warnings, health) {
+  function renderWarnings(warnings, warningKeys, health) {
     warningsList.innerHTML = '';
     if (warnings.length === 0) {
       var li = document.createElement('li');
       li.className = 'warnings-empty';
-      li.textContent = 'No warnings — looking good!';
+      li.textContent = tr('dashboard.noWarnings');
       warningsList.appendChild(li);
       return;
     }
@@ -281,23 +294,24 @@
       textSpan.textContent = warnings[i];
       li.appendChild(textSpan);
 
-      var prompt = getPromptForWarning(warnings[i], health);
+      var key = (warningKeys && warningKeys[i]) || '';
+      var prompt = getPromptForWarning(key, warnings[i], health);
       if (prompt) {
         var tooltipWrapper = document.createElement('span');
         tooltipWrapper.className = 'prompt-tooltip-wrapper';
 
         var btn = document.createElement('button');
         btn.className = 'copy-prompt-btn';
-        btn.textContent = 'Copy AI Prompt';
+        btn.textContent = tr('dashboard.copyAiPrompt');
         btn.setAttribute('data-prompt', prompt);
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
           var button = this;
           var text = button.getAttribute('data-prompt');
           navigator.clipboard.writeText(text).then(function () {
-            button.textContent = 'Copied!';
+            button.textContent = tr('dashboard.copied');
             setTimeout(function () {
-              button.textContent = 'Copy AI Prompt';
+              button.textContent = tr('dashboard.copyAiPrompt');
             }, 1500);
           });
         });
@@ -355,7 +369,7 @@
     if (highFuncs.length === 0) {
       var li = document.createElement('li');
       li.className = 'high-complexity-empty';
-      li.textContent = 'No high-complexity functions found.';
+      li.textContent = tr('dashboard.noHighComplexity');
       highComplexityList.appendChild(li);
       return;
     }
@@ -478,7 +492,7 @@
     if (files.length === 0) {
       var empty = document.createElement('div');
       empty.className = 'high-complexity-empty';
-      empty.textContent = 'No files analyzed yet.';
+      empty.textContent = tr('dashboard.noFilesAnalyzed');
       fileTreeContainer.appendChild(empty);
       return;
     }
@@ -505,17 +519,19 @@
 
       var row = document.createElement('div');
       row.className = 'tree-row';
-      row.style.paddingLeft = (depth * 16) + 'px';
+      row.style.paddingLeft = Math.max(0, depth * 16) + 'px';
 
       var arrow = document.createElement('span');
       arrow.className = 'tree-arrow';
       arrow.textContent = isExpanded ? '\u25BC' : '\u25B6';
 
+      var folderIconSrc = iconsBaseUri + '/' + (isExpanded ? 'folder-open.svg' : 'folder.svg');
       var folderIcon = document.createElement('img');
       folderIcon.className = 'tree-icon-img';
-      folderIcon.src = iconsBaseUri + '/' + (isExpanded ? 'folder-open.svg' : 'folder.svg');
-      folderIcon.width = 16;
-      folderIcon.height = 16;
+      folderIcon.setAttribute('src', folderIconSrc);
+      folderIcon.setAttribute('width', '16');
+      folderIcon.setAttribute('height', '16');
+      folderIcon.setAttribute('alt', '');
 
       var label = document.createElement('span');
       label.className = 'tree-label';
@@ -533,7 +549,7 @@
         arrowEl.parentElement.addEventListener('click', function () {
           var open = childrenEl.classList.toggle('expanded');
           arrowEl.textContent = open ? '\u25BC' : '\u25B6';
-          iconEl.src = iconsBaseUri + '/' + (open ? 'folder-open.svg' : 'folder.svg');
+          iconEl.setAttribute('src', iconsBaseUri + '/' + (open ? 'folder-open.svg' : 'folder.svg'));
         });
       })(arrow, folderIcon, childrenContainer);
 
@@ -601,7 +617,7 @@
             tooltip = document.createElement('div');
             tooltip.className = 'file-tooltip';
             if (fileData.functions.length === 0) {
-              tooltip.textContent = 'No functions';
+              tooltip.textContent = tr('dashboard.noFunctions');
             } else {
               var lines = [];
               for (var g = 0; g < fileData.functions.length; g++) {
