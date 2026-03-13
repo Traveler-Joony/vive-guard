@@ -21,7 +21,7 @@
     "url": "https://github.com/Traveler-Joony/vive-guard/issues"
   },
   "homepage": "https://github.com/Traveler-Joony/vive-guard#readme",
-  "license": "ISC",
+  "license": "AGPL-3.0",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
